@@ -68,23 +68,18 @@ def parseGPS(line):
         The first line gives us the callsign and information about the ground
         station, the second line gives us information about the payload location.
     '''
-    if len(line)>0:
-        # Non-empty string, so we should attempt to parse it
-        try:
-            # First line contains callsign, but no other useful info
-            callsign = line.split('>')[0]
-            # Second line contains everything else
-            line = ser.readline().split('/')
-            # findDMS converts to format 'dd mm.ss N'
-            lat = todecimal(line[0]) # ex. !4432.21N
-            lon = todecimal(line[1]) # ex. 12315.39WO000
-            # line[3] ex. A=000099V2F6LBCC Near-Space Exploration
-            alt, volt = line[3][2:8], line[3][9:12]
-            desc = line[3][12:]
-            return callsign, lat, lon, alt, volt, desc
-        except Exception, e:
-            # An exception is thrown if any of the above formatting fails
-            print "Error: " + str(e)
+    try:
+        line = ser.readline().split('/')
+        # findDMS converts to format 'dd mm.ss N'
+        lat = todecimal(line[0]) # ex. !4432.21N
+        lon = todecimal(line[1]) # ex. 12315.39WO000
+        # line[3] ex. A=000099V2F6LBCC Near-Space Exploration
+        alt, volt = line[3][2:8], line[3][9:12]
+        desc = line[3][12:]
+        return lat, lon, alt, volt, desc
+    except Exception, e:
+        # An exception is thrown if any of the above formatting fails
+        print "Error: " + str(e)
     # An empty return means no useful data was gathered
     return None
 
@@ -104,9 +99,17 @@ if __name__ == "__main__":
     fileName = time.strftime('%d/%m/%Y')
     f = open(filePath+fileName, 'a')
 
+    # Next, listen for incoming serial data
     while True:
-        data = parseGPS(ser.readline())
-        if data:
+        # First line contains callsign, but no other useful info
+        callsign = ser.readline()
+        if callsign.find('>'):
+            callsign = callsign.split('>')[0]
+            # Second line contains everything else
+            data = parseGPS(ser.readline())
+        if callsign and data:
+            # Waypoints can only be created from valid callsign/gps combinations
+            data.append(callsign)
             wp = Waypoint(data)
             if wp.getCallsign() in lbccCallsigns:
                 # It's one of our payloads, do something with it
