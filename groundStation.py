@@ -96,6 +96,9 @@ if __name__ == "__main__":
     fileName = time.strftime('%d/%m/%Y')
     f = open(filePath+fileName, 'a')
 
+    # List of valid LBCC callsigns
+    lbccCallsigns = ['N7SEC-1']
+
     # Next, listen for incoming serial data
     while True:
         # First line contains callsign, but no other useful info
@@ -105,8 +108,8 @@ if __name__ == "__main__":
             # Second line contains everything else
             # parseGPS returns a dictionary of key:value pairs
             data = parseGPS(ser.readline())
+        # Waypoints can only be created from valid data
         if callsign and data:
-            # Waypoints can only be created from valid callsign/gps combinations
             data['callsign'] = callsign
             wp = Waypoint(data)
             if wp.getCallsign() in lbccCallsigns:
