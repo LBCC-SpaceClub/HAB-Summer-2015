@@ -5,31 +5,24 @@ import time, serial
 class Waypoint:
     ' A GPS coordinate. '
 
-    def __init__(self, lat, lon, alt, volt = 'NA', callsign='Unknown', desc='NA'):
-        self.callsign = callsign
-        self.lat = lat
-        self.lon = lon
-        self.alt = alt
-        self.volt = volt
-        self.desc = desc
-        self.time = time.time()
+    def __init__(self, dic):
+        ' Create a new waypoint object '
+        allowed_keys = ['callsign', 'lat', 'lon', 'alt', 'volt', 'desc']
+        for k, v in dic.items():
+            if k in allowed_keys:
+                setattr(self, k, v)
+        self.time = time.asctime( time.localtime(time.time()) )
 
     def __str__(self):
-        'Overrided print function.'
-        return "Callsign: {callsign}, Description: {desc}, " \
-               "Lat: {lat}, Lon:{long}," \
-                "Alt: {alt}, Voltage: {volt}, " \
-               "Time: {time}"\
-                .format(self.callsign, self.lat, self.lon,
-                        self.alt, self.volt, self.desc, self.time)
+        ' Print function '
+        return "{} spotted at: {}, {}; timestamp: {}".format(
+            self.callsign, self.lat, self.lon, self.time)
 
     def getCallsign(self):
         return self.callsign
 
     def getCoords(self):
-        return self.lat+' '+self.lon
-
-
+        return self.lat, self.lon
 
 
 def parseGPS(line):
@@ -37,26 +30,26 @@ def parseGPS(line):
     Parse a gps string into a list of components.
     Sample string:
     !4432.22N/12315.39WO000/000/A=000082V2F6LBCC Near-Space Exploration
+    Returns a dictionary of components.
     '''
 
     def todecimal(s):
         '''
-        Converts from raw gps lat or long, to decimal coordinate
+        Helper function to convert deg:min:sec to decimal degrees
         Sample inputs can vary, here are two we expect to see:
         !4432.21N
         12315.39WO000
         '''
-        # Strip leading non-numeric characters
         if s.startswith('!'):
             s = s[1:]
-        # String becomes predictable from decimal point
+        # String is predictable from decimal point
         i = s.find('.')
-        deg = int( s[:i-2] )
-        min = float( s[i-2:i+3] )
-        hem = s[i+3]
+        deg = int(s[:i-2])
+        min = float(s[i-2:i+3])
+        hemisphere = s[i+3]
         result = deg + min/60
-        # Account for pos/neg degrees
-        if hem in ('W', 'S'):
+        # Account for hemisphere by flipping +/-
+        if hemisphere in ('W', 'S'):
             result *= -1
         return round(result, 6)
 
@@ -65,18 +58,22 @@ def parseGPS(line):
             N7SEC-1>APBL10,WIDE1-1,WIDE2-1: <<UI>>:
             !4432.21N/12315.39WO000/000/A=000099V2F6LBCC Near-Space Exploration
 
-        The first line gives us the callsign and information about the ground
-        station, the second line gives us information about the payload location.
+        The first line gives us the call sign and information about the ground
+        station, the second line gives us information about the payload location
     '''
     try:
-        line = ser.readline().split('/')
-        # findDMS converts to format 'dd mm.ss N'
-        lat = todecimal(line[0]) # ex. !4432.21N
-        lon = todecimal(line[1]) # ex. 12315.39WO000
-        # line[3] ex. A=000099V2F6LBCC Near-Space Exploration
-        alt, volt = line[3][2:8], line[3][9:12]
-        desc = line[3][12:]
-        return lat, lon, alt, volt, desc
+        line = line.split('/')
+        ret = {
+            'lat': todecimal(line[0]),  # ex. !4432.21N
+            'lon': todecimal(line[1]),  # ex. 12315.39WO000
+            # line[3] ex. A=000099V2F6LBCC Near-Space Exploration
+            'alt': int(line[3][2:8]),
+            'volt': line[3][9:12],
+            'desc': line[3][12:]
+        }
+        return ret
+        # return lat, lon, alt, volt, desc
+
     except Exception, e:
         # An exception is thrown if any of the above formatting fails
         print "Error: " + str(e)
@@ -106,10 +103,11 @@ if __name__ == "__main__":
         if callsign.find('>'):
             callsign = callsign.split('>')[0]
             # Second line contains everything else
+            # parseGPS returns a dictionary of key:value pairs
             data = parseGPS(ser.readline())
         if callsign and data:
             # Waypoints can only be created from valid callsign/gps combinations
-            data.append(callsign)
+            data['callsign'] = callsign
             wp = Waypoint(data)
             if wp.getCallsign() in lbccCallsigns:
                 # It's one of our payloads, do something with it
