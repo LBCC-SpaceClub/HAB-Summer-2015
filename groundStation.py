@@ -1,9 +1,7 @@
-__author__ = 'The LBCC Space Club'
-
 import time, serial
 
 class Waypoint:
-    ' A GPS coordinate. '
+    ''' A GPS coordinate. '''
 
     def __init__(self, dic):
         ' Create a new waypoint object '
@@ -32,7 +30,6 @@ def parseGPS(line):
     !4432.22N/12315.39WO000/000/A=000082V2F6LBCC Near-Space Exploration
     Returns a dictionary of components.
     '''
-
     def todecimal(s):
         '''
         Helper function to convert deg:min:sec to decimal degrees
@@ -52,15 +49,6 @@ def parseGPS(line):
         if hemisphere in ('W', 'S'):
             result *= -1
         return round(result, 6)
-
-    '''
-        Each gps reading is made up of two separate lines:
-            N7SEC-1>APBL10,WIDE1-1,WIDE2-1: <<UI>>:
-            !4432.21N/12315.39WO000/000/A=000099V2F6LBCC Near-Space Exploration
-
-        The first line gives us the call sign and information about the ground
-        station, the second line gives us information about the payload location
-    '''
     try:
         line = line.split('/')
         ret = {
@@ -80,47 +68,48 @@ def parseGPS(line):
     # An empty return means no useful data was gathered
     return None
 
-if __name__ == "__main__":
+def main():
     try:
-        # First, try to connect to the local radio source
+        # Try to connect to the local radio source
         ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=3)
-        print ser
+        # Next, create or append to a text file to save any results:
+        filePath = 'logs/'
+        fileName = time.strftime('%d-%m-%Y')+'.txt'
+        f = open(filePath+fileName, 'a')
+        print ser # debugging
 
     except Exception, e:
+        # If the serial connection fails, there is no point continuing
         print "Error: Could not connect to radio source."
         print e
-        quit() # If the connection fails, there is no point continuing
-
-    # Next, create or append to a text file to save any results:
-    filePath = 'logs/'
-    fileName = time.strftime('%d/%m/%Y')
-    f = open(filePath+fileName, 'a')
+        quit()
 
     # List of valid LBCC callsigns
     lbccCallsigns = ['N7SEC-1']
 
-    # Next, listen for incoming serial data
     while True:
-        # First line contains callsign, but no other useful info
+        # First string of data contains callsign & garbage
         callsign = ser.readline()
-        if callsign.find('>'):
+        if '>' in callsign:
             callsign = callsign.split('>')[0]
             # Second line contains everything else
             # parseGPS returns a dictionary of key:value pairs
             data = parseGPS(ser.readline())
-        # Waypoints can only be created from valid data
-        if callsign and data:
-            data['callsign'] = callsign
-            wp = Waypoint(data)
-            if wp.getCallsign() in lbccCallsigns:
-                # It's one of our payloads, do something with it
-                print wp
-                # plot wp to map
-                # write wp to file
-                f.write(wp)
-            else:
-                # It's someone else's payload, but we should still see it
-                print "Bogey detected, scrambling MIG's:"
-                print "\t"+wp
+            # Waypoints can only be created from valid data
+            if data:
+                data['callsign'] = callsign
+                wp = Waypoint(data)
+                if wp.getCallsign() in lbccCallsigns:
+                    # It's one of our payloads, do something with it
+                    print wp
+                    # plot wp to map
+                    # write wp to file
+                    f.write(wp)
+                else:
+                    # It's someone else's payload, but we should still see it
+                    print "Bogey detected, scrambling MIG's:"
+                    print "\t"+wp
+    f.close() # Close the text file..
 
-    f.close()
+if __name__ == "__main__":
+    main()
