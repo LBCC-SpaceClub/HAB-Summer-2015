@@ -1,10 +1,15 @@
-import time, serial
+import time, serial, sys
+# apparently, it's hard to import a library if it lacks an __init__.py
+sys.path.insert(1, 'pygmaps')
+import pygmaps
+import webbrowser
 
 class Waypoint:
     ''' A GPS coordinate. '''
 
     def __init__(self, dic):
         ' Create a new waypoint object '
+        self.color = '#ffff00' # default yellow
         allowed_keys = ['callsign', 'lat', 'lon', 'alt', 'volt', 'desc']
         for k, v in dic.items():
             if k in allowed_keys:
@@ -19,8 +24,14 @@ class Waypoint:
     def getCallsign(self):
         return self.callsign
 
+    def setColor(self, color):
+        self.color = color
+
     def getCoords(self):
         return self.lat, self.lon
+
+    def mapInfo(self):
+        return self.lat, self.lon, self.color
 
 
 def parseGPS(line):
@@ -68,6 +79,14 @@ def parseGPS(line):
     # An empty return means no useful data was gathered
     return None
 
+def drawRoute(route):
+    '''
+    Draws a map using a list of decimal deg waypoints
+    '''
+    for point in route:
+        map.addpoint(point)
+
+
 def main():
     try:
         # Try to connect to the local radio source
@@ -86,6 +105,9 @@ def main():
 
     # List of valid LBCC callsigns
     lbccCallsigns = ['N7SEC-1']
+    mapPath = 'maps/'+time.strftime('%d-%m-%Y')+'.html'
+    map = pygmaps.maps(44.537, -123.2565, 14)
+    route = []
 
     while True:
         # First string of data contains callsign & garbage
@@ -99,16 +121,25 @@ def main():
             if data:
                 data['callsign'] = callsign
                 wp = Waypoint(data)
-                if wp.getCallsign() in lbccCallsigns:
+                if callsign in lbccCallsigns:
+                    wp.setColor('#0000ff') # Set color to blue
                     # It's one of our payloads, do something with it
                     print wp
-                    # plot wp to map
+                    route.append(wp.mapInfo())
                     # write wp to file
                     f.write(wp)
                 else:
                     # It's someone else's payload, but we should still see it
                     print "Bogey detected, scrambling MIG's:"
                     print "\t"+wp
+                    # Draw unknown points in red(?)
+                    wp.setColor('#0000ff') # Set color to blue
+
+                # ugly, because this opens a new tab for new data
+                map.addpoint(wp.mapInfo())
+                map.draw(mapPath)
+                webbrowser.open_new_tab(mapPath)
+
     f.close() # Close the text file..
 
 if __name__ == "__main__":
