@@ -1,0 +1,3 @@
+[submodule "pygmaps"]
+	path = pygmaps
+	url = https://github.com/google-code-export/pygmaps
