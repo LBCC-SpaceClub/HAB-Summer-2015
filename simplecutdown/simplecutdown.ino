@@ -47,7 +47,7 @@ void loop() {
   unsigned long curSec = millis()/1000;
 
   // Compare launch time (min) against time since launch (rounded down to min)
-  if(launchDelay >= curSec/60){
+  if(curSec/60 >= launchDelay){
     cutdown();
   }
 
